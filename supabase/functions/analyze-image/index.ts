@@ -26,19 +26,39 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const enabledOptions = (options as string[]).join(", ");
+    const enabledOptions = options as string[];
+    const optionsListAr: Record<string, string> = {
+      "Camera Angle": "زاوية الكاميرا",
+      "Camera Effects": "تأثيرات الكاميرا",
+      "Environment": "البيئة المحيطة",
+      "Colors": "الألوان",
+      "Materials & Textures": "الخامات والمواد",
+      "Lighting": "الإضاءة",
+      "Time of Day": "التوقيت",
+      "Art Style": "أسلوب الصورة",
+      "Mood & Emotion": "التعبيرات والمشاعر",
+      "Composition": "التكوين",
+    };
 
-    const systemPrompt = `You are an expert image prompt engineer. Analyze the provided image and generate a detailed, professional prompt that could be used to recreate or modify a similar image using AI image generation models.
+    const sectionsJson = enabledOptions.map(opt => `"${opt}": {"ar": "...", "en": "..."}`).join(", ");
 
-Focus on these aspects: ${enabledOptions}
+    const systemPrompt = `You are an expert image prompt engineer. Analyze the provided image and generate a detailed, professional prompt.
+
+Start with a creative title and overview, then provide detailed analysis for EACH of these sections: ${enabledOptions.join(", ")}
 
 IMPORTANT: Return your response in EXACTLY this JSON format (no markdown, no code blocks):
-{"promptAr": "البرومت بالعربية هنا", "promptEn": "The English prompt here"}
+{
+  "titleAr": "عنوان إبداعي بالعربية",
+  "titleEn": "Creative English Title",
+  "overviewAr": "وصف عام شامل بالعربية",
+  "overviewEn": "Comprehensive overview in English",
+  "sections": {${sectionsJson}}
+}
 
-The Arabic prompt should be a professional, detailed description in Arabic.
-The English prompt should be a professional, detailed description in English.
-Both prompts should be comprehensive and ready to use with AI image generation models like Midjourney, DALL-E, or Stable Diffusion.
-Make each prompt detailed, specific, and professional. Include technical photography terms when relevant.`;
+For each section, provide a rich, detailed paragraph (3-5 sentences minimum) with technical terminology.
+The Arabic text should be professional and use proper Arabic photography/art terms.
+The English text should be professional and include technical terms suitable for AI image generation prompts like Midjourney, DALL-E, or Stable Diffusion.
+Be extremely detailed and specific about what you observe in the image.`;
 
     // Extract base64 data from data URL
     const base64Match = image.match(/^data:image\/([^;]+);base64,(.+)$/);
@@ -116,13 +136,16 @@ Make each prompt detailed, specific, and professional. Include technical photogr
       result = JSON.parse(content);
     } catch {
       // Try extracting JSON from markdown code blocks
-      const jsonMatch = content.match(/\{[\s\S]*"promptAr"[\s\S]*"promptEn"[\s\S]*\}/);
+      const jsonMatch = content.match(/\{[\s\S]*"titleAr"[\s\S]*"sections"[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
         result = {
-          promptAr: content,
-          promptEn: content,
+          titleAr: "تحليل الصورة",
+          titleEn: "Image Analysis",
+          overviewAr: content,
+          overviewEn: content,
+          sections: {},
         };
       }
     }

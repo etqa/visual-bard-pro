@@ -6,15 +6,13 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import ImageUploader from "@/components/ImageUploader";
 import PromptOptions, { defaultOptions, type PromptOption } from "@/components/PromptOptions";
-import PromptResult from "@/components/PromptResult";
+import PromptResult, { type StructuredPrompt } from "@/components/PromptResult";
 
 const Index = () => {
   const [image, setImage] = useState<string | null>(null);
   const [options, setOptions] = useState<PromptOption[]>(defaultOptions);
-  const [promptAr, setPromptAr] = useState("");
-  const [promptEn, setPromptEn] = useState("");
+  const [prompt, setPrompt] = useState<StructuredPrompt | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hasResult, setHasResult] = useState(false);
 
   const handleToggle = useCallback((id: string) => {
     setOptions((prev) =>
@@ -35,7 +33,7 @@ const Index = () => {
     }
 
     setLoading(true);
-    setHasResult(false);
+    setPrompt(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("analyze-image", {
@@ -44,9 +42,7 @@ const Index = () => {
 
       if (error) throw error;
 
-      setPromptAr(data.promptAr || "");
-      setPromptEn(data.promptEn || "");
-      setHasResult(true);
+      setPrompt(data as StructuredPrompt);
       toast.success("تم إنشاء البرومت بنجاح! ✨");
     } catch (err: any) {
       console.error("Error generating prompt:", err);
@@ -130,13 +126,8 @@ const Index = () => {
         </motion.div>
 
         {/* Results */}
-        {hasResult && (
-          <PromptResult
-            promptAr={promptAr}
-            promptEn={promptEn}
-            onUpdateAr={setPromptAr}
-            onUpdateEn={setPromptEn}
-          />
+        {prompt && (
+          <PromptResult prompt={prompt} />
         )}
 
         {/* Footer */}
