@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image, options } = await req.json();
+    const { image, options, model } = await req.json();
 
     if (!image) {
       return new Response(JSON.stringify({ error: "No image provided" }), {
@@ -81,7 +81,7 @@ Be extremely detailed and specific about what you observe in the image.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: model || "google/gemini-3-flash-preview",
           messages: [
             { role: "system", content: systemPrompt },
             {

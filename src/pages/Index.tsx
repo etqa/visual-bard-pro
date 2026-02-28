@@ -7,12 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 import ImageUploader from "@/components/ImageUploader";
 import PromptOptions, { defaultOptions, type PromptOption } from "@/components/PromptOptions";
 import PromptResult, { type StructuredPrompt } from "@/components/PromptResult";
+import ModelSelector from "@/components/ModelSelector";
 
 const Index = () => {
   const [image, setImage] = useState<string | null>(null);
   const [options, setOptions] = useState<PromptOption[]>(defaultOptions);
   const [prompt, setPrompt] = useState<StructuredPrompt | null>(null);
   const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState("google/gemini-3-flash-preview");
 
   const handleToggle = useCallback((id: string) => {
     setOptions((prev) =>
@@ -37,7 +39,7 @@ const Index = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke("analyze-image", {
-        body: { image, options: enabledOptions },
+        body: { image, options: enabledOptions, model },
       });
 
       if (error) throw error;
@@ -96,6 +98,9 @@ const Index = () => {
           <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             ⚙️ خيارات البرومت
           </h2>
+          <div className="mb-4">
+            <ModelSelector value={model} onChange={setModel} />
+          </div>
           <PromptOptions options={options} onToggle={handleToggle} />
         </motion.section>
 
