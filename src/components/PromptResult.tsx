@@ -1,24 +1,69 @@
 import { useState } from "react";
 import { Copy, Check, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
-interface PromptResultProps {
-  promptAr: string;
-  promptEn: string;
-  onUpdateAr: (val: string) => void;
-  onUpdateEn: (val: string) => void;
+interface PromptSection {
+  ar: string;
+  en: string;
 }
 
-const PromptResult = ({ promptAr, promptEn, onUpdateAr, onUpdateEn }: PromptResultProps) => {
-  const [copiedLang, setCopiedLang] = useState<string | null>(null);
-  const [editingLang, setEditingLang] = useState<string | null>(null);
+export interface StructuredPrompt {
+  titleAr: string;
+  titleEn: string;
+  overviewAr: string;
+  overviewEn: string;
+  sections: Record<string, PromptSection>;
+}
 
-  const handleCopy = async (text: string, lang: string) => {
-    await navigator.clipboard.writeText(text);
+const sectionEmojis: Record<string, string> = {
+  "Camera Angle": "📷",
+  "Camera Effects": "🎬",
+  "Environment": "🌍",
+  "Colors": "🎨",
+  "Materials & Textures": "🧱",
+  "Lighting": "💡",
+  "Time of Day": "⏰",
+  "Art Style": "🖼️",
+  "Mood & Emotion": "😊",
+  "Composition": "📐",
+};
+
+const sectionLabelsAr: Record<string, string> = {
+  "Camera Angle": "زاوية الكاميرا",
+  "Camera Effects": "تأثيرات الكاميرا",
+  "Environment": "البيئة المحيطة",
+  "Colors": "الألوان",
+  "Materials & Textures": "الخامات والمواد",
+  "Lighting": "الإضاءة",
+  "Time of Day": "التوقيت",
+  "Art Style": "أسلوب الصورة",
+  "Mood & Emotion": "التعبيرات والمشاعر",
+  "Composition": "التكوين",
+};
+
+interface PromptResultProps {
+  prompt: StructuredPrompt;
+}
+
+const PromptResult = ({ prompt }: PromptResultProps) => {
+  const [copiedLang, setCopiedLang] = useState<string | null>(null);
+
+  const buildFullText = (lang: "ar" | "en") => {
+    const title = lang === "ar" ? prompt.titleAr : prompt.titleEn;
+    const overview = lang === "ar" ? prompt.overviewAr : prompt.overviewEn;
+    let text = `${title}\n${overview}\n\n`;
+    for (const [key, section] of Object.entries(prompt.sections)) {
+      const label = lang === "ar" ? (sectionLabelsAr[key] || key) : key;
+      text += `${label}\n${section[lang]}\n\n`;
+    }
+    return text.trim();
+  };
+
+  const handleCopy = async (lang: "ar" | "en") => {
+    await navigator.clipboard.writeText(buildFullText(lang));
     setCopiedLang(lang);
     toast.success(lang === "ar" ? "تم النسخ!" : "Copied!");
     setTimeout(() => setCopiedLang(null), 2000);
@@ -40,81 +85,44 @@ const PromptResult = ({ promptAr, promptEn, onUpdateAr, onUpdateEn }: PromptResu
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ar" className="mt-4">
-          <div className="glass-card rounded-xl p-4 gradient-border">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-foreground">البرومت بالعربية</h3>
-              <div className="flex gap-2">
+        {(["ar", "en"] as const).map((lang) => (
+          <TabsContent key={lang} value={lang} className="mt-4">
+            <div className="glass-card rounded-xl p-5 gradient-border space-y-4">
+              {/* Header with copy */}
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-foreground text-lg">
+                  {lang === "ar" ? prompt.titleAr : prompt.titleEn}
+                </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setEditingLang(editingLang === "ar" ? null : "ar")}
+                  onClick={() => handleCopy(lang)}
                   className="h-8 w-8"
                 >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleCopy(promptAr, "ar")}
-                  className="h-8 w-8"
-                >
-                  {copiedLang === "ar" ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+                  {copiedLang === lang ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
-            </div>
-            {editingLang === "ar" ? (
-              <Textarea
-                value={promptAr}
-                onChange={(e) => onUpdateAr(e.target.value)}
-                className="min-h-[150px] bg-background/50 border-border text-foreground"
-                dir="rtl"
-              />
-            ) : (
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap text-sm" dir="rtl">
-                {promptAr}
-              </p>
-            )}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="en" className="mt-4">
-          <div className="glass-card rounded-xl p-4 gradient-border">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-foreground">English Prompt</h3>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setEditingLang(editingLang === "en" ? null : "en")}
-                  className="h-8 w-8"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleCopy(promptEn, "en")}
-                  className="h-8 w-8"
-                >
-                  {copiedLang === "en" ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            {editingLang === "en" ? (
-              <Textarea
-                value={promptEn}
-                onChange={(e) => onUpdateEn(e.target.value)}
-                className="min-h-[150px] bg-background/50 border-border text-foreground"
-                dir="ltr"
-              />
-            ) : (
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap text-sm" dir="ltr">
-                {promptEn}
+              {/* Overview */}
+              <p className="text-muted-foreground leading-relaxed text-sm" dir={lang === "ar" ? "rtl" : "ltr"}>
+                {lang === "ar" ? prompt.overviewAr : prompt.overviewEn}
               </p>
-            )}
-          </div>
-        </TabsContent>
+
+              {/* Sections */}
+              {Object.entries(prompt.sections).map(([key, section]) => (
+                <div key={key} className="border-t border-border/30 pt-3">
+                  <h4 className="font-semibold text-foreground text-sm flex items-center gap-2 mb-2" dir={lang === "ar" ? "rtl" : "ltr"}>
+                    <span>{sectionEmojis[key] || "📌"}</span>
+                    <span>{lang === "ar" ? (sectionLabelsAr[key] || key) : key}</span>
+                  </h4>
+                  <p className="text-muted-foreground leading-relaxed text-sm whitespace-pre-wrap" dir={lang === "ar" ? "rtl" : "ltr"}>
+                    {section[lang]}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        ))}
       </Tabs>
     </motion.div>
   );
