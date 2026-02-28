@@ -2,12 +2,15 @@ import { useState, useCallback } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import ImageUploader from "@/components/ImageUploader";
 import PromptOptions, { defaultOptions, type PromptOption } from "@/components/PromptOptions";
 import PromptResult, { type StructuredPrompt } from "@/components/PromptResult";
 import ModelSelector from "@/components/ModelSelector";
+import ImageModelSelector from "@/components/ImageModelSelector";
+import ImageContainer from "@/components/ImageContainer";
 
 const Index = () => {
   const [image, setImage] = useState<string | null>(null);
@@ -15,12 +18,30 @@ const Index = () => {
   const [prompt, setPrompt] = useState<StructuredPrompt | null>(null);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState("google/gemini-3-flash-preview");
+  const [imageModel, setImageModel] = useState("google/gemini-2.5-flash-image");
+
+  // Image generation states
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [editedImage, setEditedImage] = useState<string | null>(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [editingImage, setEditingImage] = useState(false);
+  const [editInstruction, setEditInstruction] = useState("");
 
   const handleToggle = useCallback((id: string) => {
     setOptions((prev) =>
       prev.map((opt) => (opt.id === id ? { ...opt, enabled: !opt.enabled } : opt))
     );
   }, []);
+
+  const buildFullPrompt = (p: StructuredPrompt, lang: "en" | "ar") => {
+    const title = lang === "ar" ? p.titleAr : p.titleEn;
+    const overview = lang === "ar" ? p.overviewAr : p.overviewEn;
+    let text = `${title}\n${overview}\n\n`;
+    for (const [key, section] of Object.entries(p.sections)) {
+      text += `${key}\n${section[lang]}\n\n`;
+    }
+    return text.trim();
+  };
 
   const handleGenerate = async () => {
     if (!image) {
@@ -36,6 +57,8 @@ const Index = () => {
 
     setLoading(true);
     setPrompt(null);
+    setGeneratedImage(null);
+    setEditedImage(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("analyze-image", {
@@ -51,6 +74,59 @@ const Index = () => {
       toast.error(err.message || "حدث خطأ أثناء إنشاء البرومت");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!prompt || !image) return;
+
+    setGeneratingImage(true);
+    try {
+      const fullPrompt = buildFullPrompt(prompt, "en");
+      const { data, error } = await supabase.functions.invoke("generate-image", {
+        body: {
+          action: "generate",
+          prompt: fullPrompt,
+          referenceImage: image,
+          model: imageModel,
+        },
+      });
+
+      if (error) throw error;
+
+      setGeneratedImage(data.image);
+      toast.success("تم إنشاء الصورة بنجاح! 🎨");
+    } catch (err: any) {
+      console.error("Error generating image:", err);
+      toast.error(err.message || "حدث خطأ أثناء إنشاء الصورة");
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
+  const handleEditImage = async () => {
+    if (!generatedImage) return;
+
+    setEditingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-image", {
+        body: {
+          action: "edit",
+          editImage: generatedImage,
+          editInstruction: editInstruction || "Improve and enhance this image, make it more detailed and professional.",
+          model: imageModel,
+        },
+      });
+
+      if (error) throw error;
+
+      setEditedImage(data.image);
+      toast.success("تم تعديل الصورة بنجاح! ✏️");
+    } catch (err: any) {
+      console.error("Error editing image:", err);
+      toast.error(err.message || "حدث خطأ أثناء تعديل الصورة");
+    } finally {
+      setEditingImage(false);
     }
   };
 
@@ -132,7 +208,72 @@ const Index = () => {
 
         {/* Results */}
         {prompt && (
-          <PromptResult prompt={prompt} />
+          <>
+            <PromptResult prompt={prompt} />
+
+            {/* Image Generation Section */}
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-10"
+            >
+              <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                🖼️ إنشاء وتعديل الصور
+              </h2>
+
+              {/* Image Model Selector */}
+              <div className="mb-6">
+                <ImageModelSelector value={imageModel} onChange={setImageModel} />
+              </div>
+
+              {/* 3 Image Containers */}
+              <div className="grid grid-cols-1 gap-4">
+                {/* Container 1: Original Image */}
+                <ImageContainer
+                  label="الصورة الأصلية"
+                  emoji="📸"
+                  image={image}
+                />
+
+                {/* Container 2: Generated Image from Prompt */}
+                <ImageContainer
+                  label="الصورة المولّدة من البرومت"
+                  emoji="🎨"
+                  image={generatedImage}
+                  loading={generatingImage}
+                  actionLabel="إنشاء صورة من البرومت"
+                  actionIcon="generate"
+                  onAction={handleGenerateImage}
+                  disabled={!prompt}
+                />
+
+                {/* Container 3: Edited Image */}
+                <div>
+                  <ImageContainer
+                    label="الصورة بعد التعديل"
+                    emoji="✏️"
+                    image={editedImage}
+                    loading={editingImage}
+                    actionLabel="تعديل الصورة المولّدة"
+                    actionIcon="edit"
+                    onAction={handleEditImage}
+                    disabled={!generatedImage}
+                  />
+                  {generatedImage && (
+                    <div className="mt-3">
+                      <Textarea
+                        value={editInstruction}
+                        onChange={(e) => setEditInstruction(e.target.value)}
+                        placeholder="أدخل تعليمات التعديل... مثال: اجعل الألوان أكثر دفئاً، أضف غروب الشمس..."
+                        className="rounded-xl bg-background/50 border-border/30 text-sm min-h-[80px]"
+                        dir="rtl"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.section>
+          </>
         )}
 
         {/* Footer */}
